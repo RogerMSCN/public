@@ -227,6 +227,8 @@ Create a log entity, includes fields needed.
   - new_username
   - new_useryominame
   - new_webapilogtype
+
+[Find more details](https://github.com/RogerMSCN/public/blob/main/Public%20Documents/LogSolution.xlsx).
 #### SQL Server implement
 Create table.
 ```SQL Script
