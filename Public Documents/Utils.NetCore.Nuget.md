@@ -8,6 +8,9 @@ This is a collection of utils based on .net core 5.0. It will help you to manage
 - Send request to dynamics 365 web api.
 
 For these utils, you need to create user settings in default configuration file named "appsettings.json" with root section named "UserSettings".
+
+[Find more details](https://raw.githubusercontent.com/RogerMSCN/public/main/Public%20Documents/Utils.NetCore.md)
+or [public readme file.](https://github.com/RogerMSCN/public/blob/main/Public%20Documents/Utils.NetCore.md)
 ## Write log
 If you wanted to write log, please register dependency first.
 #### Asp.Net Core
