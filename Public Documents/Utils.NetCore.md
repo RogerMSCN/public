@@ -61,11 +61,11 @@ For these utils, you need to create user settings in default configuration file 
       },
       /* Settings for dynamics 365 environment which log will be written to. */
       "Dynamics365LogSettings": {
-        /* The client id in azure app registration. */
+        /* The name of client id in secret storage. */
         "ClientIdName": "My Client Id",
-        /* The client secret in azure app registration. */
+        /* The name of client secret in secret storage. */
         "ClientSecretName": "My Client Secret",
-        /* The tenant id in azure app registration. */
+        /* The name of tenant id in secret storage. */
         "TenantIdName": "My Tenant Id",
         /* The root url of dynamics 365. */
         "Resource": "https://myorg.crm.dynamics.com",
@@ -98,7 +98,23 @@ For these utils, you need to create user settings in default configuration file 
             InContentFieldName
             OutContentFieldName
         */
-        "CategoryFieldName": "name"
+        "CategoryFieldName": "name",
+        /* 
+            The type of authentication provider. Includes:
+            AzureApp
+            AzureUser
+            AzureApp, as an application registered in azure active directory. If this, ignore user id and user password. The grant type in token request is client_credentials.
+            AzureUser, as a user in azure active directory, If this, must input user id and user password. The grant type in token request is password. When gets a valid token, will get a valid refresh_token too, may get new token by this refresh_token.
+        */
+        "AuthenticationType": "AzureUser",
+        /* Domain name. */        
+        "Domain": "MyDomain",
+        /* The name of user id in secret storage. */
+        "UserIdName": "User Id",
+        /* The name of user password in secret storage. */
+        "UserPassName": "User Pass",
+        /* The root url of active directory federation services. */
+        "ADFSRootUrl": "http://myorg/api/data/v9.0"
       },
       /* Settings for sql server which log will be written to. */
       "SqlDbLogSettings": {
@@ -109,12 +125,12 @@ For these utils, you need to create user settings in default configuration file 
         /* If true, need to set sql user id and sql user password. */
         "UserCredentialNeeded": true,
         /* 
-            The field name which is store the sql user id in secret storage. 
+            The name of sql user id in secret storage. 
             If UserCredentialNeeded was true, can not empty. 
         */
         "UserIdName": "SQL User Id",
         /* 
-            The field name which is store the sql user password in secret storage. 
+            The name of sql user password in secret storage. 
             If UserCredentialNeeded was true, can not empty. 
         */
         "UserPassName": "SQL User Password",
@@ -224,8 +240,6 @@ Create a log entity, includes fields needed.
   - new_starttime
   - new_user
   - new_userloginname
-  - new_username
-  - new_useryominame
   - new_webapilogtype
 
 [Find more details](https://github.com/RogerMSCN/public/blob/main/Public%20Documents/LogSolution.xlsx).
