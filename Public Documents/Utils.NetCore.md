@@ -139,13 +139,42 @@ For these utils, you need to create user settings in default configuration file 
         /* Defines the lowest logging severity levels. */
         "MinLogLevel": "Trace"
       }
+    },
+    /* Settings for dynamics 365 environment which log will be written to. */
+    "Dynamics365Settings": {
+    /* The name of client id in secret storage. */
+    "ClientIdName": "My Client Id",
+    /* The name of client secret in secret storage. */
+    "ClientSecretName": "My Client Secret",
+    /* The name of tenant id in secret storage. */
+    "TenantIdName": "My Tenant Id",
+    /* The root url of dynamics 365. */
+    "Resource": "https://myorg.crm.dynamics.com",
+    /* Service Root URL of dynamics 365 web api. */
+    "WebApiRootUrl": "https://myorg.api.crm.dynamics.com/api/data/v9.2",
+    /* 
+        The type of authentication provider. Includes:
+        AzureApp
+        AzureUser
+        AzureApp, as an application registered in azure active directory. If this, ignore user id and user password. The grant type in token request is client_credentials.
+        AzureUser, as a user in azure active directory, If this, must input user id and user password. The grant type in token request is password. When gets a valid token, will get a valid refresh_token too, may get new token by this refresh_token.
+    */
+    "AuthenticationType": "AzureUser",
+    /* Domain name. */        
+    "Domain": "MyDomain",
+    /* The name of user id in secret storage. */
+    "UserIdName": "User Id",
+    /* The name of user password in secret storage. */
+    "UserPassName": "User Pass",
+    /* The root url of active directory federation services. */
+    "ADFSRootUrl": "http://myorg/api/data/v9.0"
     }
   }
 ```
 ## Write log
 If you wanted to write log, please register dependency first.
-#### Asp.Net Core
-Register logger provider in ***Program.cs***
+### Asp.Net Core
+Register logger provider in ***Program.cs***.
 ```c#
     public static IHostBuilder CreateHostBuilder(string[] args) =>
         Host.CreateDefaultBuilder(args)
@@ -174,7 +203,7 @@ Register logger provider in ***Program.cs***
                 logging.AddFullLogger();
             });
 ```
-Register necessary components in ***Startup.cs***
+Register necessary components in ***Startup.cs***.
 ```C#
     public void ConfigureServices(IServiceCollection services)
     {
@@ -201,7 +230,7 @@ Then call functions to write log.
 ```C#
     _logger.LogInformationAsync(DateTime.Now.AddDays(-1), DateTime.Now, "Test LogInformation");
 ```
-#### Application Core
+### Application Core
 Register dependencies in entry.
 ```C#
     IConfiguration config = new ConfigurationBuilder()
@@ -210,7 +239,6 @@ Register dependencies in entry.
         .Build();
 
     var services = new ServiceCollection()
-        .AddScoped<ITestOutput, TestOutput>()
         .AddSingleton<ISecretConfiguration, SecretConfiguration>()
         .AddLogging()
         .AddHttpClient()
@@ -219,7 +247,7 @@ Register dependencies in entry.
         .Configure<UserSettings>(config.GetSection(UserSettings.Name))
         .BuildServiceProvider();
 ```
-#### Dynamics 365 implement
+### Dynamics 365 implement
 Create a log entity, includes fields needed.
 - Table name: new_logdetail
 - Columns:
@@ -243,7 +271,7 @@ Create a log entity, includes fields needed.
   - new_webapilogtype
 
 [Find more details](https://github.com/RogerMSCN/public/blob/main/Public%20Documents/LogSolution.xlsx).
-#### SQL Server implement
+### SQL Server implement
 Create table.
 ```SQL Script
     Create Table LogDetail
@@ -341,3 +369,100 @@ Create store procedure.
     END
     GO
 ```
+## Send request to dynamics 365
+### Register dependency
+#### Asp.Net Core
+Register necessary components in ***Startup.cs***.
+```C#
+    public void ConfigureServices(IServiceCollection services)
+    {
+        /* Add http client component for http request. */
+        services.AddHttpClient();
+        /* Add the type declare, it will be used to load secrets from secret storage. */
+        services.AddSingleton<ISecretConfiguration, SecretConfiguration>();
+        /* 
+            Add the settings declare, it will get all settings from app configurations, UserSettings.Name is the name of root section in app configurations. 
+        */
+        services.Configure<UserSettings>(Configuration.GetSection(UserSettings.Name));
+        services.AddControllers();
+    }
+```
+#### Application Core
+Register dependencies in entry.
+```C#
+    IConfiguration config = new ConfigurationBuilder()
+        .SetBasePath(Directory.GetCurrentDirectory())
+        .Add(new JsonConfigurationSource { Path = "appsettings.json", ReloadOnChange = true })
+        .Build();
+
+    var services = new ServiceCollection()
+        .AddSingleton<ISecretConfiguration, SecretConfiguration>()
+        .AddHttpClient()
+        .AddOptions()
+        .Configure<UserSettings>(config.GetSection(UserSettings.Name))
+        .BuildServiceProvider();
+```
+### Actions
+In this util, you may send requests below to dynamics 365:
+- Create
+- Query
+- Update
+- Delete
+- Upsert
+- Associate
+- Disassociate
+#### Create
+In any models which will create record, create neccesary instance in constructor.
+```C#
+    private readonly IHttpClientFactory _clientFactory;
+    private readonly UserSettings _userSettings;
+    private readonly IOptions<UserSettings> _options;
+    private readonly ISecretConfiguration _secretConfiguration;
+
+    public WeatherForecastController(IHttpClientFactory clientFactory, IOptions<UserSettings> userSettings, ISecretConfiguration secretConfiguration)
+    {
+        _clientFactory = clientFactory;
+        _userSettings = userSettings.Value;
+        _options = userSettings;
+        _secretConfiguration = secretConfiguration;
+    }
+```
+Create fields detail with type ***Dictionary<string, object>***.
+```C#
+    Dictionary<string, object> accountDetails = new Dictionary<string, object>() { { "name", $"Test account" } };
+```
+Create a ***CrmServiceHelper*** instance, send request by create action.
+```C#
+    CrmServiceHelper serviceHelper = new CrmServiceHelper(_clientFactory, _options, _secretConfiguration);
+    HttpResponseMessage result = serviceHelper.CreateAsync(_userSettings.Dynamics365Settings.WebApiRootUrl, "accounts", accountDetails, new string[] { "name", "ownerid" }).Result;
+```
+If you wanted to get all annotations informations, please set ***IncludeAnnotationsEnabled = true***.
+```C#
+    serviceHelper.IncludeAnnotationsEnabled = true;
+```
+If you wanted to send request on behalf of another user, please set ***CallId***.
+```C#
+    serviceHelper.CallId = UserId;
+```
+#### Query
+Please send request by query action.
+#### Update
+Please send request by update action.
+#### Delete
+Please send request by delete action.
+#### Upsert
+Please send request by upsert action. If you have not set upsert type, it would create record(not found record) or update record(found record). You may set upsert type for special action.
+- Upsert.Update. It will only update record, if not found, got not found(404) error.
+- Upsert.Insert. It will only create record, if found, got precondition failed(412) error.
+#### Associate
+It will create a relationship record for 1:N or N:N relationship.
+```C#
+    HttpResponseMessage result = serviceHelper.AssociateAsync(_userSettings.Dynamics365Settings.WebApiRootUrl, "accounts", AccountId, "contact_customer_accounts", "contacts", ContactId).Result;
+```
+If success, got response result of no content(204).
+#### Disassociate
+It will delete a relationship record for 1:N or N:N relationship.
+```C#
+    HttpResponseMessage result = serviceHelper.DisassociateAsync(_userSettings.Dynamics365Settings.WebApiRootUrl, "accounts", AccountId, "contact_customer_accounts", "contacts", ContactId).Result;
+```
+If success, got response result of no content(204).
